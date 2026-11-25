@@ -1,0 +1,129 @@
+﻿using Ecommerce535.Data;
+using Ecommerce535.Repositories;
+using Ecommerce535.Utilities;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace Ecommerce535.Areas.Admin.Controllers
+{
+    [Area("Admin")]
+    [Authorize(Roles = $"{CD.SUPER_ADMIN_ROLE} , {CD.ADMIN_ROLE} , {CD.EMPLOYEE_ROLE}")]
+
+    public class BrandsController : Controller
+    {
+        //private readonly ApplicationDbContext _context = new ApplicationDbContext();
+        private readonly IRepository<Brand> _brandRepository;//= new Repository<Brand>();
+
+        public BrandsController(IRepository<Brand> brandRepository)
+        {
+            _brandRepository = brandRepository;
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            //var brands = _context.Brands.AsQueryable();
+            var brands = await _brandRepository.GetAllAsync();
+            // filter 
+            return View(brands.AsEnumerable());
+        }
+        [HttpGet]
+        public IActionResult Create()
+        {
+            return View();
+        }
+        [HttpPost]
+        public async Task<IActionResult> Create(Brand brand, IFormFile ImageFile)
+        {
+            if (ImageFile != null && ImageFile.Length > 0)
+            {
+                //a3f1c2d4-7b8e-4a9f-9c2d-1e5f6a7b8c9d.jpg
+                //var fileName = Guid.NewGuid().ToString() +Path.GetExtension(ImageFile.FileName);
+                //a3f1c2d4-7b8e-4a9f-9c2d-1e5f6a7b8c9d-1.jpg
+                var fileName = Guid.NewGuid().ToString() + "-" + ImageFile.FileName;
+                //var filePath = "D:\\EraaSoft\\535\\Project\\Ecommerce535\\Ecommerce535\\wwwroot\\images\\";
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\images\\", fileName);
+
+
+                using (var stream = System.IO.File.Create(filePath))
+                {
+                    ImageFile.CopyTo(stream);
+                }
+                brand.Logo = fileName;
+            }
+            //_context.Brands.Add(brand);
+            //_context.SaveChanges();
+            await _brandRepository.AddAsync(brand);
+            await _brandRepository.CommitAsync();
+            return RedirectToAction(nameof(Index));
+        }
+        [HttpGet]
+        public async Task<IActionResult> Update(int id)
+        {
+            //var brand = _context.Brands.FirstOrDefault(c => c.Id == id);
+            var brand = await _brandRepository.GetOneAsync(c => c.Id == id);
+            if (brand == null)
+            {
+                return RedirectToAction("NotFoundPage", "Home");
+            }
+            return View(brand);
+        }
+        [HttpPost]
+        public async Task<IActionResult> Update(Brand brand ,  IFormFile ImageFile)
+        {
+            //var brandInDb = _context.Brands.AsNoTracking().FirstOrDefault(b => b.Id == brand.Id);
+            var brandInDb = await _brandRepository.GetOneAsync(b => b.Id == brand.Id , isTracked: false) ;
+
+            if (ImageFile != null && ImageFile.Length > 0)
+            {
+                var fileName = Guid.NewGuid().ToString() + "-" + ImageFile.FileName;
+                var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\images\\", fileName);
+
+                using (var stream = System.IO.File.Create(filePath))
+                {
+                    ImageFile.CopyTo(stream);
+                }
+                brand.Logo = fileName;
+
+
+                var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\images\\", brandInDb.Logo);
+
+                if (System.IO.File.Exists(oldFilePath))
+                {
+                    System.IO.File.Delete(oldFilePath);
+                }
+            }
+            else
+            {
+                brand.Logo = brandInDb.Logo; 
+            }
+            //_context.Brands.Update(brand);
+            //_context.SaveChanges();
+            _brandRepository.Update(brand); 
+            await _brandRepository.CommitAsync(); 
+            return RedirectToAction(nameof(Index));
+        }
+
+        public async Task<IActionResult> Delete(int id)
+        {
+            //var brand = _context.Brands.FirstOrDefault(c => c.Id == id);
+            var brand = await _brandRepository.GetOneAsync(c => c.Id == id);
+            if (brand == null)
+            {
+                return RedirectToAction("NotFoundPage", "Home");
+            }
+            var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot\\images\\", brand.Logo);
+
+            if (System.IO.File.Exists(oldFilePath))
+            {
+                System.IO.File.Delete(oldFilePath);
+            }
+            //_context.Brands.Remove(brand);
+            //_context.SaveChanges();
+            _brandRepository.Remove(brand);
+            await _brandRepository.CommitAsync(); 
+            return RedirectToAction(nameof(Index));
+        }
+
+    }
+}
